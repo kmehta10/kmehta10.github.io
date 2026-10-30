@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IV Med Competency: Mock Exam</title>
+<style>
+  :root{
+    --bg:#0f1218; --panel:#171b23; --panel2:#1e2430; --line:#2a3240;
+    --text:#e8ecf2; --muted:#9aa5b5; --accent:#5aa9ff; --good:#3ecf8e; --bad:#ff6b6b; --warn:#ffc04d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:20px 16px 80px}
+  h1{font-size:1.5rem;margin:.2em 0}
+  h2{font-size:1.2rem;margin:.2em 0 .6em}
+  h3{font-size:1rem;margin:1em 0 .4em;color:var(--accent)}
+  p{margin:.4em 0}
+  .muted{color:var(--muted)}
+  .small{font-size:.88rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0}
+  .card.inner{background:var(--panel2);margin:10px 0;padding:14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:640px){.grid2{grid-template-columns:1fr}}
+  button{font:inherit;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;font-weight:600}
+  .btn{background:var(--accent);color:#06121f}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+  .btn.good{background:var(--good);color:#04140c}
+  .btn.bad{background:var(--bad);color:#1c0505}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button{background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:10px 14px}
+  .seg button.on{background:var(--accent);color:#06121f;border-color:var(--accent)}
+  .tester{border-left:4px solid var(--warn);background:#221d10;padding:12px 14px;border-radius:8px;margin:10px 0;font-size:1.05rem}
+  .tester b{color:var(--warn)}
+  .answer{display:none;border-left:4px solid var(--good);background:#0f2019;padding:12px 14px;border-radius:8px;margin:12px 0}
+  .answer.show{display:block}
+  .answer ul{margin:.3em 0;padding-left:1.2em}
+  .flag{border-left:4px solid var(--bad);background:#2a1414;padding:10px 12px;border-radius:8px;margin:8px 0}
+  .ok{border-left:4px solid var(--good);background:#0f2019;padding:10px 12px;border-radius:8px;margin:8px 0}
+  table{width:100%;border-collapse:collapse;font-size:.95rem}
+  td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+  th{color:var(--muted);font-weight:600;width:38%}
+  .progress{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:8px 0 4px}
+  .progress div{height:100%;background:var(--accent);transition:width .3s}
+  .pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.8rem;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+  .label{background:#fffbea;color:#1a1a1a;border-radius:8px;padding:12px 14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem;border:2px dashed #b8a24a}
+  .band{background:#f4f7ff;color:#111;border-radius:30px;padding:10px 20px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem;display:inline-block;border:2px solid #9bb4e6}
+  input[type=number]{font:inherit;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;width:130px}
+  .result-good{color:var(--good);font-weight:600}
+  .result-bad{color:var(--bad);font-weight:600}
+  .summary-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
+  .formula{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);padding:2px 6px;border-radius:6px}
+  footer{margin-top:30px;color:var(--muted);font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+/* ------------------------------------------------------------------
+   DATA: drug cards, monograph facts, orders, patient flags
+   Typical values for practice. Her Mosby's + Canvas monographs win.
+------------------------------------------------------------------- */
+const DRUGS = {
+  labetalol: {
+    name: "Labetalol (Trandate)",
+    short: "Labetalol",
+    card: {
+      "Drug class": "Alpha and beta adrenergic blocker (blocks alpha-1, beta-1, beta-2)",
+      "Functional class": "Antihypertensive",
+      "Indication": "Severe high blood pressure / hypertensive emergency",
+      "Contraindications": "Asthma or bronchospasm, severe bradycardia, heart block (more than 1st degree), cardiogenic shock, uncompensated heart failure",
+      "Mechanism of action": "Blocks alpha-1 (vessels relax) and beta receptors (heart slows, less force). Result: BP goes down.",
+      "Side effects": "Dizziness, low BP when standing up, tiredness, nausea, scalp tingling",
+      "Adverse effects": "Severe hypotension, bradycardia, heart block, bronchospasm, heart failure, liver injury",
+      "Onset / peak / duration": "Say the IV numbers from her Mosby's"
+    },
+    mono: {
+      "High-risk?": "Yes (IV beta blocker = high-alert). Infusions go on a pump.",
+      "IV direct initial dose (adult)": "Typically 20 mg slow IV push over 2 min; may repeat 40 to 80 mg every 10 min (max total about 300 mg)",
+      "Infusion rate range": "Typically 0.5 to 2 mg/min (confirm range in her monograph)",
+      "Stable in": "NS, D5W, LR, D5NS. NOT with sodium bicarbonate.",
+      "Nursing checks": "BP + HR before and often during. Keep patient lying down for a while after IV doses (dizziness)."
+    },
+    reasons: ["Severe hypertension (BP above 180/110)"],
+    orders: [
+      {type:"rate", dose:"200 mg", vol:200, diluent:"NS", conc:1, mgPerMin:2, freq:"Continuous infusion; titrate to target BP per order"},
+      {type:"rate", dose:"200 mg", vol:200, diluent:"NS", conc:1, mgPerMin:1, freq:"Continuous infusion; titrate to target BP per order"}
+    ],
+    compatible: ["NS","D5W","LR"],
+    runNote: "Labetalol runs as a continuous infusion at an ordered mg/min rate, so the 'run time' comes from the rate.",
+    flags: [
+      {id:"none", vitals:"BP 186/112, HR 88, RR 18, SpO2 97%", history:"Hypertension, type 2 diabetes", pause:"No hold reason. BP is high (that's why we give it). HR is fine. Note: in diabetes, beta blockers can hide signs of low blood sugar, so watch glucose."},
+      {id:"brady", vitals:"BP 184/110, HR 50, RR 16, SpO2 96%", history:"Hypertension", pause:"HR 50 is low. Labetalol slows the heart more. HOLD and notify the prescriber before giving."},
+      {id:"asthma", vitals:"BP 188/114, HR 92, RR 22, SpO2 93%, expiratory wheeze", history:"Hypertension, asthma (uses salbutamol inhaler)", pause:"Asthma with active wheeze. Labetalol blocks beta-2 in the lungs and can cause bronchospasm. HOLD and notify the prescriber."}
+    ]
+  },
+  ceftazidime: {
+    name: "Ceftazidime (Ceptaz / Tazidime / Fortaz)",
+    short: "Ceftazidime",
+    card: {
+      "Drug class": "3rd generation cephalosporin",
+      "Functional class": "Anti-infective (antibiotic)",
+      "Indication": "Serious infections, especially gram-negative incl. Pseudomonas: pneumonia, complicated UTI, sepsis, meningitis, skin/bone",
+      "Contraindications": "Allergy to cephalosporins. Caution: penicillin allergy (cross-allergy possible), kidney problems (dose adjust)",
+      "Mechanism of action": "Binds penicillin-binding proteins, blocks bacterial cell wall building. Wall breaks, bacteria die (bactericidal).",
+      "Side effects": "Nausea, diarrhea, rash, headache, pain or phlebitis at IV site",
+      "Adverse effects": "Anaphylaxis, C. diff diarrhea, seizures (high dose + kidney problems), severe skin reactions, low blood counts",
+      "Onset / peak / duration": "Say the IV numbers from her Mosby's"
+    },
+    mono: {
+      "Minibag size": "Typically 50 to 100 mL",
+      "Infuse over": "Typically 15 to 30 minutes",
+      "Adult 24 hr dose range": "Typically 1 to 6 g per 24 hr (common: 1 to 2 g every 8 to 12 hr)",
+      "Stable in": "NS, D5W, LR (and D5NS, D5W/0.45% NaCl)"
+    },
+    reasons: ["Hospital-acquired pneumonia (Pseudomonas)", "Complicated UTI"],
+    orders: [
+      {type:"time", dose:"1 g", vol:50, diluent:"NS", min:30, freq:"q8h"},
+      {type:"time", dose:"2 g", vol:100, diluent:"NS", min:30, freq:"q8h"},
+      {type:"time", dose:"1 g", vol:100, diluent:"D5W", min:20, freq:"q12h"},
+      {type:"time", dose:"1 g", vol:50, diluent:"NS", min:15, freq:"q12h"}
+    ],
+    compatible: ["NS","D5W","LR"],
+    runNote: "Typical ceftazidime run time is 15 to 30 minutes.",
+    flags: [
+      {id:"none", allergy:"No known drug allergies (NKDA)", vitals:"T 38.4, BP 118/72, HR 102, RR 22, SpO2 93%", history:"COPD", pause:"No hold reason. Fever and fast HR fit the infection. Watch for allergic reaction during the first dose."},
+      {id:"pcnRash", allergy:"Penicillin (rash)", vitals:"T 38.1, BP 122/76, HR 98, RR 20, SpO2 95%", history:"Kidney stones", pause:"Penicillin allergy. Cephalosporins are cousins, so cross-allergy is possible. Clarify the reaction (rash) and confirm with the prescriber before giving. Monitor closely."},
+      {id:"pcnAna", allergy:"Penicillin (anaphylaxis)", vitals:"T 38.6, BP 110/68, HR 108, RR 24, SpO2 92%", history:"Diabetes", pause:"Penicillin ANAPHYLAXIS. Serious cross-allergy risk. HOLD and notify the prescriber before giving."}
+    ]
+  },
+  moxifloxacin: {
+    name: "Moxifloxacin (Avelox)",
+    short: "Moxifloxacin",
+    card: {
+      "Drug class": "Fluoroquinolone",
+      "Functional class": "Anti-infective (antibiotic)",
+      "Indication": "Community-acquired pneumonia, sinusitis, bronchitis flare-up, skin and abdominal infections",
+      "Contraindications": "Allergy to quinolones, history of tendon problems with quinolones. Caution: QT prolongation, low K or Mg, myasthenia gravis, older adults, steroid use",
+      "Mechanism of action": "Blocks DNA gyrase and topoisomerase IV. Bacteria can't copy their DNA, so they die (bactericidal).",
+      "Side effects": "Nausea, diarrhea, dizziness, headache, sun sensitivity",
+      "Adverse effects": "Tendon rupture, QT prolongation (dangerous rhythm), nerve damage, seizures/CNS effects, blood sugar swings, C. diff, worsened myasthenia gravis",
+      "Onset / peak / duration": "Say the IV numbers from her Mosby's"
+    },
+    mono: {
+      "Minibag size": "Premixed 400 mg in 250 mL",
+      "Infuse over": "60 minutes (never fast)",
+      "Adult recommended dose": "400 mg IV once every 24 hr",
+      "Stable in": "NS, D5W, D10W, LR, sterile water. Don't run with other drugs in the same line at the same time."
+    },
+    reasons: ["Community-acquired pneumonia"],
+    orders: [
+      {type:"time", dose:"400 mg", vol:250, diluent:"premixed", min:60, freq:"q24h"}
+    ],
+    compatible: ["NS","D5W","LR"],
+    runNote: "Moxifloxacin always runs over 60 minutes.",
+    flags: [
+      {id:"none", vitals:"T 38.2, BP 128/80, HR 96, RR 22, SpO2 94%", history:"Hypothyroidism", pause:"No hold reason. Ask about tendon pain and dizziness during therapy."},
+      {id:"tendon", vitals:"T 38.0, BP 134/82, HR 90, RR 20, SpO2 95%", history:"Age 76, takes prednisone daily for arthritis", pause:"Older adult + steroid = higher tendon rupture risk. Flag to prescriber, teach patient to report heel/calf pain right away."},
+      {id:"qt", vitals:"T 38.3, BP 126/78, HR 88, RR 20, SpO2 95%", history:"Long QT on ECG, potassium 3.1 this morning", pause:"QT risk + low potassium. Moxifloxacin can prolong QT. HOLD and notify the prescriber."}
+    ]
+  }
+};
+
+const PATIENTS = [
+  ["Margaret Chen","F"],["Daniel Okafor","M"],["Priya Nair","F"],["Robert Leblanc","M"],
+  ["Sofia Alvarez","F"],["James Whitfield","M"],["Aisha Rahman","F"],["Thomas Murphy","M"]
+];
+
+const SITES = {
+  normal: {text:"Left forearm, 20G, inserted 2 days ago. Dressing clean, dry, intact. No redness. No swelling. Flushes easily. Patient says no pain.",
+    answer:"<b>Healthy, patent site.</b> OK to use. Say what you checked: redness, warmth, swelling, pain, hardness along vein, dressing, date, patency (flushes, blood return)."},
+  phlebitis: {text:"Right forearm, 20G, inserted 3 days ago. Skin over the vein is red and warm. The vein feels hard, like a cord. Patient: \"It burns along my arm.\"",
+    answer:"<b>Phlebitis</b> (inflamed vein). Do NOT give the med through this site.<ul><li>Stop the infusion</li><li>Remove the IV catheter</li><li>Warm compress, elevate the arm</li><li>Restart IV in another site (other arm)</li><li>Grade it on the phlebitis scale, document, notify per policy</li></ul>"},
+  infiltration: {text:"Left hand, 22G. Area around the site is puffy, pale, and cool. Skin looks tight. Primary drip has slowed. Patient: \"It feels tight.\"",
+    answer:"<b>Infiltration</b> (fluid leaking into tissue). Do NOT give the med through this site.<ul><li>Stop the infusion</li><li>Remove the IV catheter</li><li>Elevate the arm</li><li>Compress per policy (warm or cold depends on the fluid)</li><li>Measure/assess the area, restart IV in another site</li><li>Document, notify per policy</li></ul>"}
+};
+
+/* ------------------------------------------------------------------
+   HELPERS
+------------------------------------------------------------------- */
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const chance = p => Math.random() < p;
+const r2 = x => Math.round(x*100)/100;
+const fmt2 = x => r2(x).toFixed(2);
+const $ = s => document.querySelector(s);
+
+function randomUI(){ return String(Math.floor(100000 + Math.random()*900000)); }
+function randomDOB(){
+  const y = 1945 + Math.floor(Math.random()*45), m = 1+Math.floor(Math.random()*12), d = 1+Math.floor(Math.random()*28);
+  return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+}
+function swapDigits(s){ const a = s.split(""); [a[2],a[3]] = [a[3],a[2]]; if(a.join("")===s){ a[5] = String((+a[5]+1)%10); } return a.join(""); }
+
+/* ------------------------------------------------------------------
+   STATE
+------------------------------------------------------------------- */
+let settings = { drug:"random", drop:10, site:"random" };
+let S = null;      // scenario
+let step = 0;
+let results = [];
+
+/* ------------------------------------------------------------------
+   SCENARIO BUILDER
+------------------------------------------------------------------- */
+function buildScenario(){
+  const key = settings.drug === "random" ? pick(Object.keys(DRUGS)) : settings.drug;
+  const D = DRUGS[key];
+  const [pname, sex] = pick(PATIENTS);
+  const order = pick(D.orders);
+  const flag = pick(D.flags);
+  const siteKey = settings.site === "random" ? pick(["normal","normal","phlebitis","infiltration"]) : settings.site;
+  const primary = pick(D.compatible);
+  const primaryRate = pick([75,80,100,125]);
+  const tubingOld = chance(0.25);
+  const ui = randomUI(), dob = randomDOB();
+  const bed = 1 + Math.floor(Math.random()*12);
+
+  // calc
+  const C = settings.drop;
+  let pump, gravRaw, work;
+  if(order.type === "time"){
+    pump = order.vol / (order.min/60);
+    gravRaw = order.vol * C / order.min;
+    const mult = {15:4,20:3,30:2,60:1}[order.min];
+    work = {
+      pump: `${order.vol} mL ÷ ${fmt2(order.min/60)} hr = <b>${r2(pump)} mL/hr</b>` + (mult ? `<br><span class="muted small">Quick tip: ${order.min} min → volume × ${mult} = ${order.vol} × ${mult} = ${order.vol*mult}</span>` : ""),
+      grav: `V ÷ T × C = ${order.vol} ÷ ${order.min} × ${C} = ${fmt2(gravRaw)} → <b>${Math.round(gravRaw)} gtt/min</b>`
+    };
+  } else {
+    const mgHr = order.mgPerMin * 60;
+    pump = mgHr / order.conc;
+    gravRaw = (pump/60) * C;
+    const minutes = order.vol / (pump/60);
+    work = {
+      pump: `Bag = ${order.dose} in ${order.vol} mL = ${order.conc} mg/mL.<br>${order.mgPerMin} mg/min × 60 = ${mgHr} mg/hr. ${mgHr} mg/hr ÷ ${order.conc} mg/mL = <b>${r2(pump)} mL/hr</b><br><span class="muted small">Bag lasts ${order.vol} ÷ ${r2(pump)} = ${fmt2(order.vol/pump)} hr (${Math.round(minutes)} min)</span>`,
+      grav: `${r2(pump)} mL/hr ÷ 60 = ${fmt2(pump/60)} mL/min × ${C} = ${fmt2(gravRaw)} → <b>${Math.round(gravRaw)} gtt/min</b><br><span class="flag small" style="display:block;margin-top:6px">Trick: labetalol is high-alert. In real life it goes on a <b>pump</b>, not gravity. Say that to the tester.</span>`
+    };
+  }
+
+  // errors
+  const marErr = chance(0.4) ? pick(["dose","route","freq"]) : null;
+  const bandErr = chance(0.3);
+
+  const allergy = flag.allergy || pick(["No known drug allergies (NKDA)","Sulfa (rash)","Codeine (nausea)"]);
+  const dueHr = pick(["0900","1000","1200","1400","1800"]);
+  const nowHr = String(+dueHr.slice(0,2) - 1).padStart(2,"0") + "45";
+
+  S = { key, D, pname, sex, order, flag, siteKey, primary, primaryRate, tubingOld, ui, dob, bed, C,
+        pump, gravRaw, grav: Math.round(gravRaw), work, marErr, bandErr, allergy, dueHr, nowHr,
+        reason: pick(D.reasons) };
+}
+
+function orderText(o, D){
+  const bag = o.diluent === "premixed" ? `${o.dose} in ${o.vol} mL (premixed)` : `${o.dose} in ${o.vol} mL ${o.diluent}`;
+  if(o.type === "time") return `${D.short} ${bag} IV over ${o.min} min ${o.freq}`;
+  return `${D.short} ${bag} IV at ${o.mgPerMin} mg/min. ${o.freq}`;
+}
+function marOrderText(){
+  const o = S.order, D = S.D;
+  let dose = o.dose, route = "IV", freq = o.freq;
+  if(S.marErr === "dose"){ dose = o.dose === "1 g" ? "2 g" : o.dose === "2 g" ? "1 g" : o.dose === "400 mg" ? "800 mg" : "400 mg"; }
+  if(S.marErr === "route"){ route = "IM"; }
+  if(S.marErr === "freq"){ freq = o.type === "rate" ? "Once only" : (o.freq === "q8h" ? "q4h" : o.freq === "q12h" ? "q6h" : "q12h"); }
+  const bag = o.diluent === "premixed" ? `${dose} in ${o.vol} mL (premixed)` : `${dose} in ${o.vol} mL ${o.diluent}`;
+  if(o.type === "time") return `${D.short} ${bag} ${route} over ${o.min} min ${freq}`;
+  return `${D.short} ${bag} ${route} at ${o.mgPerMin} mg/min. ${freq}`;
+}
+
+function table(obj){
+  return `<table>${Object.entries(obj).map(([k,v])=>`<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>`;
+}
+
+/* ------------------------------------------------------------------
+   STEPS (follow the NURS 2701 rubric, top to bottom)
+------------------------------------------------------------------- */
+function steps(){
+  const D = S.D, o = S.order;
+  const timeOrRate = o.type === "time" ? `over ${o.min} min` : `at ${o.mgPerMin} mg/min`;
+  return [
+    {
+      title:"Identify the patient", rubric:"Complete Patient Assessment: ID patient",
+      body:`<div class="tester"><b>Tester:</b> "Your patient is in bed ${S.bed}. Show me how you identify them."</div>`,
+      answer:`<ul><li>Use <b>2 identifiers</b>: full name + DOB (or UI#)</li><li>Ask the patient to <b>say</b> their name and DOB (don't say it for them)</li><li>Match to the armband and the MAR</li></ul>`
+    },
+    {
+      title:"Assess the IV site", rubric:"Assess IV site for phlebitis/infiltration",
+      body:`<div class="card inner"><b>What you find:</b><br>${SITES[S.siteKey].text}</div>
+            <div class="tester"><b>Tester:</b> "Assess the IV site. What do you see, and what will you do?"</div>`,
+      answer:SITES[S.siteKey].answer + `<p class="small muted">Memory trick: Phlebitis = HOT (red, warm, cord). Infiltration = COLD and PUFFY.</p>`
+    },
+    {
+      title:"Assess IV solution, rate, tubing", rubric:"Assess IV solution, rate, tubing",
+      body:`<div class="card inner">${table({
+              "Order for primary line": `${S.primary} at ${S.primaryRate} mL/hr`,
+              "Bag hanging": `1000 mL ${S.primary}, about 600 mL left`,
+              "Pump shows": `${S.primaryRate} mL/hr`,
+              "Tubing label": S.tubingOld ? "Dated 5 days ago" : "Dated yesterday"
+            })}</div>
+            <div class="tester"><b>Tester:</b> "Check the primary line. Anything to report?"</div>`,
+      answer:`<ul><li>Solution matches the order (${S.primary}) ✔</li><li>Rate on pump matches the order (${S.primaryRate} mL/hr) ✔</li><li>Volume left is reasonable, no air, no kinks, clamps open</li><li>Tubing: ${S.tubingOld ? "<b style='color:var(--bad)'>Dated 5 days ago = too old.</b> Most policies change primary tubing every 96 hr. Change it per her lab's policy." : "Dated yesterday = in date ✔"}</li></ul>`
+    },
+    {
+      title:"Critical thinking: know your drug", rubric:"Drug class, functional class, indication, contraindication, MOA, side effects, adverse reactions, onset/peak/duration",
+      body:`<div class="card inner">${table({
+              "Order": orderText(o, D),
+              "Reason": S.reason,
+              "Vitals now": S.flag.vitals,
+              "History": S.flag.history,
+              "Allergies": S.allergy
+            })}</div>
+            <div class="tester"><b>Tester:</b> "Tell me about ${D.short}: all 8 critical thinking points. Then: anything about THIS patient that makes you stop?"</div>`,
+      answer:`<h3>${D.name}</h3>${table(D.card)}
+              <h3>This patient</h3><div class="${S.flag.id==="none"?"ok":"flag"}">${S.flag.pause}</div>`
+    },
+    {
+      title:"Compatibility and run time", rubric:"Compatibility / Run time",
+      body:`<div class="tester"><b>Tester:</b> "The primary line is ${S.primary}. Is ${D.short} compatible? How long does it run?"</div>`,
+      answer:`<ul><li><b>Compatible: Yes.</b> ${D.short} is stable in ${S.primary}.</li><li>Run time for this order: <b>${timeOrRate}</b>. ${D.runNote}</li></ul>
+              <h3>Monograph facts (Worksheet Part 3)</h3>${table(D.mono)}
+              <p class="small muted">Typical values. If her Canvas monograph says different, go with the monograph.</p>`
+    },
+    {
+      title:"Dose calculation", rubric:"Dose Calculation (pump & gravity rate)", calc:true,
+      body:`<div class="card inner">${table({"Order": orderText(o, D), "Secondary tubing": `${S.C} gtt/mL`})}</div>
+            <div class="tester"><b>Tester:</b> "Calculate your pump rate. Then: no pump available, give me the gravity rate."</div>
+            <div class="row" style="margin:10px 0">
+              <label>Pump <input type="number" step="any" id="inPump" placeholder="mL/hr"></label>
+              <label>Gravity <input type="number" step="any" id="inGrav" placeholder="gtt/min"></label>
+              <button class="btn ghost" onclick="checkCalc()">Check my math</button>
+            </div>
+            <div id="calcRes"></div>
+            <p class="small muted">Formula: <span class="formula">V ÷ T(min) × C = gtt/min</span>. Keep 2 decimals, round drops to a whole number.</p>`,
+      answer:`<p><b>Pump:</b> ${S.work.pump}</p><p><b>Gravity:</b> ${S.work.grav}</p>`
+    },
+    {
+      title:"MAR check: 8 Rights + allergy", rubric:"Allergy check · Check MAR verification · 8 Rights (check #1)",
+      body:`<div class="grid2">
+              <div class="card inner"><b>Prescriber's order</b>${table({"Patient":S.pname,"UI#":S.ui,"DOB":S.dob,"Order":orderText(o,D),"Reason":S.reason})}</div>
+              <div class="card inner"><b>MAR (eHR)</b>${table({"Patient":S.pname,"UI#":S.ui,"DOB":S.dob,"Allergies":S.allergy,"Med":marOrderText(),"Due":S.dueHr,"Time now":S.nowHr})}</div>
+            </div>
+            <div class="tester"><b>Tester:</b> "Check the MAR against the order. Say your 8 Rights out loud. Any problems?"</div>`,
+      answer:`<p>8 Rights: patient, medication, dose, route, time, frequency, reason, site.</p>` + (S.marErr
+          ? `<div class="flag"><b>Error found: wrong ${S.marErr}.</b> The MAR does not match the prescriber's order. Do not give. Clarify with the prescriber/pharmacy before going on.</div>`
+          : `<div class="ok"><b>No errors.</b> All 8 Rights match. Time is OK (now ${S.nowHr}, due ${S.dueHr}, within the window). Allergy checked: ${S.allergy}.</div>`)
+    },
+    {
+      title:"Prepare the drug label", rubric:"Prepares accurate drug label · 8 Rights (check #2)",
+      body:`<div class="tester"><b>Tester:</b> "Make your minibag label. What goes on it?"</div>`,
+      answer:`<div class="label">
+                PATIENT: ${S.pname}<br>UI#: ${S.ui} &nbsp; DOB: ${S.dob}<br>
+                DRUG: ${D.short} ${o.dose}<br>IN: ${o.vol} mL ${o.diluent==="premixed"?"(premixed)":o.diluent}<br>
+                ROUTE: IV &nbsp; RATE: ${r2(S.pump)} mL/hr ${o.type==="time"?`(over ${o.min} min)`:""}<br>
+                DATE/TIME: ____ &nbsp; NURSE INITIALS: ____
+              </div>
+              <p class="small" style="margin-top:8px">Do the 8 Rights again while making it (check #2).</p>`
+    },
+    {
+      title:"Bedside check", rubric:"Recheck calc · Copy name/UI#/DOB · Verify armband + allergy · Scan · 8 Rights (check #3)",
+      body:`<div class="card inner"><b>Armband:</b><br><span class="band">${S.pname} · UI# ${S.bandErr ? swapDigits(S.ui) : S.ui} · DOB ${S.dob}</span>
+            <p class="small muted" style="margin-top:8px">Your bag label says UI# ${S.ui}.</p></div>
+            <div class="tester"><b>Tester:</b> "You're at the bedside. What do you do before you hang it?"</div>`,
+      answer:`<ul><li>Recheck the dose calculation (pump + gravity)</li><li>Ask patient to state name + DOB, compare armband to label</li><li>Ask about allergies again</li><li>Scan the med label, then the wristband</li><li>8 Rights check #3</li><li>Explain the med to the patient</li></ul>` +
+             (S.bandErr ? `<div class="flag"><b>Error: armband UI# does not match the label.</b> STOP. Do not give. Sort out patient ID first.</div>` : `<div class="ok">Armband matches the label ✔</div>`)
+    },
+    {
+      title:"Attach the piggyback", rubric:"Attach piggyback using sterile technique",
+      body:`<div class="tester"><b>Tester:</b> "Walk me through hanging and attaching the piggyback."</div>`,
+      answer:`<ul><li>Hand hygiene</li><li>Close the secondary tubing clamp</li><li>Spike the minibag without touching the spike (sterile)</li><li>Prime the secondary line (or back-prime per lab practice)</li><li>Scrub the upper Y-port with alcohol (about 15 sec), let dry</li><li>Connect the secondary to the upper port</li><li>Hang the minibag <b>higher</b>; lower the primary with the extension hook (gravity makes the piggyback run first)</li><li>Open the secondary clamp</li></ul>`
+    },
+    {
+      title:"Regulate the rate", rubric:"Regulates rate accurately",
+      body:`<div class="tester"><b>Tester:</b> "Set the rate. Show me how you know it's right."</div>`,
+      answer:`<ul><li><b>Pump:</b> program a secondary infusion: rate <b>${r2(S.pump)} mL/hr</b>, volume to be infused <b>${o.vol} mL</b>. Confirm and start.</li><li><b>Gravity:</b> adjust the roller clamp, count drops for a <b>full minute</b> to get <b>${S.grav} gtt/min</b> (${S.C} gtt/mL tubing).</li><li>Check the drip chamber is dripping and the patient is OK. Recheck the site.</li></ul>`
+    },
+    {
+      title:"Document", rubric:"Documentation: date/time/dose in eHR",
+      body:`<div class="tester"><b>Tester:</b> "What do you document?"</div>`,
+      answer:`<ul><li>Date and time given</li><li>Drug, dose, volume, route, rate</li><li>IV site and its condition</li><li>Patient response (and vitals if needed, e.g. BP/HR for labetalol)</li><li>Your signature/initials in the eHR</li></ul>`
+    }
+  ];
+}
+
+/* ------------------------------------------------------------------
+   RENDER
+------------------------------------------------------------------- */
+function seg(name, opts){
+  return `<div class="seg">${opts.map(([v,l])=>`<button class="${String(settings[name])===String(v)?"on":""}" onclick="setOpt('${name}','${v}')">${l}</button>`).join("")}</div>`;
+}
+function setOpt(n,v){ settings[n] = n==="drop" ? +v : v; renderStart(); }
+
+function renderStart(){
+  $("#app").innerHTML = `
+    <h1>IV Med Competency: Mock Exam</h1>
+    <p class="muted">NURS 2701 practice. One person plays the tester and reads the yellow boxes out loud. The student answers, then tap <b>Show answer</b>.</p>
+    <div class="card">
+      <h3>Drug</h3>${seg("drug",[["random","Random"],["labetalol","Labetalol"],["ceftazidime","Ceftazidime"],["moxifloxacin","Moxifloxacin"]])}
+      <h3>Her secondary tubing (check the lab kit)</h3>${seg("drop",[[10,"10 gtt/mL"],[20,"20 gtt/mL"]])}
+      <h3>IV site finding</h3>${seg("site",[["random","Random"],["normal","Normal"],["phlebitis","Phlebitis"],["infiltration","Infiltration"]])}
+      <div class="row" style="margin-top:18px"><button class="btn" onclick="start()">Start a patient →</button></div>
+    </div>
+    <div class="card">
+      <h3>How it works</h3>
+      <ul>
+        <li>12 steps, in the same order as the rubric</li>
+        <li>Each patient is random. Some have <b>hidden problems</b> (wrong MAR, wrong armband, a reason to hold). She has to catch them.</li>
+        <li>After each answer, mark <b>Got it</b> or <b>Needs work</b>. You get a score at the end.</li>
+      </ul>
+    </div>
+    <footer>Practice only. Doses and orders are made up but realistic. Her Mosby's Drug Guide and Canvas monographs win if anything differs.</footer>`;
+}
+
+function start(){ buildScenario(); step = 0; results = []; renderStep(); window.scrollTo(0,0); }
+
+function header(){
+  return `<div class="card inner" style="margin-top:0">
+    <div class="row" style="justify-content:space-between">
+      <div><b>${S.pname}</b> <span class="pill">Bed ${S.bed}</span> <span class="pill">UI# ${S.ui}</span> <span class="pill">DOB ${S.dob}</span></div>
+      <span class="pill">${S.D.short}</span>
+    </div></div>`;
+}
+
+function renderStep(){
+  const all = steps(), st = all[step];
+  const pct = Math.round((step)/all.length*100);
+  $("#app").innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <span class="muted small">Step ${step+1} of ${all.length}</span>
+      <button class="btn ghost small" style="padding:6px 12px" onclick="if(confirm('Quit this patient?'))renderStart()">Quit</button>
+    </div>
+    <div class="progress"><div style="width:${pct}%"></div></div>
+    ${header()}
+    <div class="card">
+      <h2>${step+1}. ${st.title}</h2>
+      <p class="small muted">Rubric: ${st.rubric}</p>
+      ${st.body}
+      <div class="row"><button class="btn" id="showBtn" onclick="reveal()">Show answer</button></div>
+      <div class="answer" id="ans">${st.answer}
+        <div class="row" style="margin-top:14px">
+          <button class="btn good" onclick="mark(true)">Got it ✓</button>
+          <button class="btn bad" onclick="mark(false)">Needs work ✗</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function reveal(){ $("#ans").classList.add("show"); $("#showBtn").style.display="none"; }
+
+function checkCalc(){
+  const p = parseFloat($("#inPump").value), g = parseFloat($("#inGrav").value);
+  const pOk = !isNaN(p) && Math.abs(p - S.pump) <= 1;
+  const gOk = !isNaN(g) && Math.abs(g - S.grav) < 0.5;
+  $("#calcRes").innerHTML =
+    `<p class="${pOk?"result-good":"result-bad"}">Pump: ${isNaN(p)?"(blank)":p} ${pOk?"✓ correct":"✗ try again"}</p>
+     <p class="${gOk?"result-good":"result-bad"}">Gravity: ${isNaN(g)?"(blank)":g} ${gOk?"✓ correct":"✗ try again"}</p>`;
+}
+
+function mark(ok){
+  results[step] = ok;
+  const n = steps().length;
+  if(step < n-1){ step++; renderStep(); window.scrollTo(0,0); }
+  else renderSummary();
+}
+
+function renderSummary(){
+  const all = steps(), got = results.filter(Boolean).length;
+  const traps = [];
+  if(S.siteKey !== "normal") traps.push(`IV site had ${S.siteKey}`);
+  if(S.tubingOld) traps.push("Primary tubing was too old");
+  if(S.flag.id !== "none") traps.push("Patient had a reason to pause/hold");
+  if(S.marErr) traps.push(`MAR had wrong ${S.marErr}`);
+  if(S.bandErr) traps.push("Armband UI# did not match");
+  $("#app").innerHTML = `
+    <h1>Done: ${got} / ${all.length}</h1>
+    <p class="muted">${S.pname} · ${S.D.name}</p>
+    <div class="card">
+      <h3>Hidden problems in this patient</h3>
+      ${traps.length ? `<ul>${traps.map(t=>`<li>${t}</li>`).join("")}</ul>` : `<p>None. A clean run.</p>`}
+    </div>
+    <div class="card">
+      <h3>Step by step</h3>
+      ${all.map((s,i)=>`<div class="summary-row"><span>${i+1}. ${s.title}</span><span class="${results[i]?"result-good":"result-bad"}">${results[i]?"✓":"✗ practice"}</span></div>`).join("")}
+    </div>
+    <div class="row">
+      <button class="btn" onclick="start()">Next patient →</button>
+      <button class="btn ghost" onclick="renderStart()">Change settings</button>
+    </div>`;
+  window.scrollTo(0,0);
+}
+
+renderStart();
+</script>
+</body>
+</html>
