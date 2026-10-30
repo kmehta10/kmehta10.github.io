@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IV Piggyback: Bedside Simulator</title>
+<style>
+  :root{
+    --bg:#0f1218; --panel:#171b23; --panel2:#1e2430; --line:#2a3240;
+    --text:#e8ecf2; --muted:#9aa5b5; --accent:#5aa9ff; --good:#3ecf8e; --bad:#ff6b6b; --warn:#ffc04d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:16px 12px 60px}
+  h1{font-size:1.4rem;margin:.2em 0}
+  h3{font-size:1rem;margin:1em 0 .4em;color:var(--accent)}
+  a{color:var(--accent)}
+  .muted{color:var(--muted)} .small{font-size:.88rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+  button{font:inherit;border:0;border-radius:10px;padding:11px 15px;cursor:pointer;font-weight:600}
+  .btn{background:var(--accent);color:#06121f}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button{background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:9px 13px}
+  .seg button.on{background:var(--accent);color:#06121f;border-color:var(--accent)}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:.82rem;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+  .next{border-left:4px solid var(--warn);background:#221d10;padding:10px 12px;border-radius:8px;margin:8px 0}
+  .scene{background:#141922;border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
+  svg{display:block;width:100%;height:auto;touch-action:manipulation}
+  .hs{cursor:pointer}
+  .hs:hover .hit{fill:rgba(90,169,255,.12)}
+  .glow .hit{fill:rgba(255,192,77,.18);stroke:var(--warn);stroke-width:3;stroke-dasharray:6 4;animation:pulse 1.2s infinite}
+  @keyframes pulse{50%{stroke-opacity:.25}}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;padding:10px;border-top:1px solid var(--line);background:var(--panel)}
+  .tool{background:var(--panel2);color:var(--text);border:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .tool.glow{border-color:var(--warn);box-shadow:0 0 0 3px rgba(255,192,77,.25)}
+  .toast{position:absolute;left:50%;top:10px;transform:translateX(-50%);max-width:92%;padding:10px 14px;border-radius:10px;font-weight:600;font-size:.95rem;opacity:0;transition:opacity .25s;pointer-events:none;text-align:center}
+  .toast.show{opacity:1}
+  .toast.good{background:#123d2a;color:#b9f5d8;border:1px solid var(--good)}
+  .toast.bad{background:#3d1414;color:#ffd0d0;border:1px solid var(--bad)}
+  .overlay{position:fixed;inset:0;background:rgba(5,8,12,.78);display:none;align-items:center;justify-content:center;padding:14px;z-index:10}
+  .overlay.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;max-width:560px;width:100%;max-height:92vh;overflow:auto}
+  .choice{display:block;width:100%;text-align:left;background:var(--panel2);color:var(--text);border:1px solid var(--line);margin:8px 0;font-weight:500}
+  .choice:hover{border-color:var(--accent)}
+  .say{background:var(--panel2);border-radius:10px;padding:10px 12px;margin:8px 0;font-style:italic}
+  .band{background:#f4f7ff;color:#111;border-radius:30px;padding:8px 16px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;display:inline-block;border:2px solid #9bb4e6;margin:4px 0}
+  .label{background:#fffbea;color:#1a1a1a;border-radius:8px;padding:8px 12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;border:2px dashed #b8a24a;margin:4px 0}
+  input[type=number]{font:inherit;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;width:120px}
+  input[type=range]{width:100%}
+  .bar{height:12px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:10px 0}
+  .bar div{height:100%;width:0;background:var(--good)}
+  .err{color:var(--bad)} .ok{color:var(--good)}
+  .holdbtn{width:100%;padding:22px;font-size:1.1rem;background:var(--panel2);color:var(--text);border:2px solid var(--accent);user-select:none;-webkit-user-select:none;touch-action:none}
+  .holdbtn.active{background:#123d2a;border-color:var(--good)}
+  .drop{animation:fall .55s linear forwards}
+  @keyframes fall{from{transform:translateY(0);opacity:1}to{transform:translateY(46px);opacity:.2}}
+  .sumrow{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
+  label.ck{display:flex;gap:10px;align-items:center;padding:6px 0}
+  footer{margin-top:24px;color:var(--muted);font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="overlay" id="ov"><div class="modal" id="modal"></div></div>
+
+<script>
+/* =========================================================
+   SCENARIO DATA (typical practice values)
+========================================================= */
+const ORDERS = [
+  {drug:"Ceftazidime", dose:"1 g",   vol:50,  dil:"NS",  min:30},
+  {drug:"Ceftazidime", dose:"2 g",   vol:100, dil:"NS",  min:30},
+  {drug:"Ceftazidime", dose:"1 g",   vol:50,  dil:"NS",  min:15},
+  {drug:"Ceftazidime", dose:"1 g",   vol:100, dil:"D5W", min:20},
+  {drug:"Moxifloxacin",dose:"400 mg",vol:250, dil:"premixed", min:60},
+  {drug:"Labetalol",   dose:"200 mg",vol:200, dil:"NS",  mgPerMin:2, conc:1},
+  {drug:"Labetalol",   dose:"200 mg",vol:200, dil:"NS",  mgPerMin:1, conc:1}
+];
+const ALLERGIES = {
+  Ceftazidime: [
+    {say:"No, I don't have any allergies.", hold:false},
+    {say:"Penicillin. It gave me a rash.", hold:true, why:"Penicillin and cephalosporins are cousins. Cross-allergy is possible. Hold and check with the prescriber."},
+    {say:"Penicillin. My throat swelled up and I needed an EpiPen.", hold:true, why:"Penicillin anaphylaxis. Serious cross-allergy risk with a cephalosporin. Hold and call the prescriber."}
+  ],
+  Moxifloxacin: [
+    {say:"No, I don't have any allergies.", hold:false},
+    {say:"Sulfa drugs give me a rash.", hold:false, why:"Sulfa is not related to moxifloxacin. OK to continue."},
+    {say:"Cipro. I broke out in hives.", hold:true, why:"Cipro (ciprofloxacin) is also a fluoroquinolone, the same family as moxifloxacin. Hold and call the prescriber."}
+  ],
+  Labetalol: [
+    {say:"No, I don't have any allergies.", hold:false},
+    {say:"Codeine makes me throw up.", hold:false, why:"Codeine is not related to labetalol (and nausea is a side effect, not a true allergy). OK to continue."}
+  ]
+};
+const NAMES = ["Margaret Chen","Daniel Okafor","Priya Nair","Robert Leblanc","Sofia Alvarez","James Whitfield","Aisha Rahman","Thomas Murphy"];
+
+const ACT_NAMES = {
+  sanitizer:"hand sanitizer", scanner:"barcode scanner", exthook:"extension hook", computer:"eHR computer",
+  patient:"patient", minibag:"minibag", secClamp:"secondary clamp", secChamber:"secondary drip chamber",
+  hook:"pole hook", yport:"upper Y-port", lowport:"lower port", pump:"IV pump",
+  primBag:"primary bag", primClamp:"primary roller clamp"
+};
+
+/* =========================================================
+   HELPERS + STATE
+========================================================= */
+const $ = s => document.querySelector(s);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const r2 = x => Math.round(x*100)/100;
+let settings = {drug:"random", mode:"pump", drop:10, learn:true};
+let S, st, steps, cur, errors, wrongClicks, t0, timerId, modalOpen=false, dripTimer=null, toastTimer=null;
+
+function buildScenario(){
+  let pool = settings.drug==="random" ? ORDERS : ORDERS.filter(o=>o.drug.toLowerCase()===settings.drug);
+  const o = pick(pool);
+  let mode = settings.mode, note = "";
+  if(mode==="gravity" && o.drug==="Labetalol"){ mode="pump"; note="Labetalol is high-alert, so it must go on a pump. Switched to pump mode."; }
+  const pump = o.mgPerMin ? (o.mgPerMin*60)/o.conc : o.vol/(o.min/60);
+  const C = settings.drop;
+  const grav = Math.round(o.mgPerMin ? (pump/60)*C : o.vol*C/o.min);
+  const ui = String(100000+Math.floor(Math.random()*900000));
+  const y=1945+Math.floor(Math.random()*45), m=1+Math.floor(Math.random()*12), d=1+Math.floor(Math.random()*28);
+  const dob = `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  const bandErr = Math.random()<0.25;
+  let badUI = ui.split(""); [badUI[2],badUI[3]]=[badUI[3],badUI[2]]; badUI=badUI.join(""); if(badUI===ui) badUI = ui.slice(0,5)+((+ui[5]+1)%10);
+  S = {o, mode, note, pump:r2(pump), C, grav, ui, dob, name:pick(NAMES), bandErr, badUI, allergy:pick(ALLERGIES[o.drug])};
+}
+function orderText(){
+  const o=S.o, bag = o.dil==="premixed" ? `${o.dose} in ${o.vol} mL (premixed)` : `${o.dose} in ${o.vol} mL ${o.dil}`;
+  return o.mgPerMin ? `${o.drug} ${bag} IV at ${o.mgPerMin} mg/min` : `${o.drug} ${bag} IV over ${o.min} min`;
+}
+
+/* =========================================================
+   STEPS (correct order)
+========================================================= */
+function buildSteps(){
+  const all = [
+    {id:"hygiene", act:"sanitizer", label:"Clean your hands", crit:true, done:"Hands cleaned."},
+    {id:"id", act:"patient", label:"Identify the patient (2 identifiers + armband vs label)", crit:true, modal:idModal},
+    {id:"allergy", act:"patient", label:"Ask about allergies", crit:true, modal:allergyModal},
+    {id:"scan", act:"scanner", label:"Scan the med label, then the wristband", crit:true, done:"Beep, beep. Label and wristband scanned. They match."},
+    {id:"clamp1", act:"secClamp", label:"Close the secondary tubing clamp", done:"Secondary clamp closed. Now fluid won't pour out when you spike.", apply:()=>st.clamp="closed"},
+    {id:"spike", act:"minibag", label:"Spike the minibag (sterile)", crit:true, modal:spikeModal},
+    {id:"hang", act:"hook", label:"Hang the minibag on the pole", done:"Minibag hung on the pole.", apply:()=>st.hung=true},
+    {id:"chamber", act:"secChamber", label:"Squeeze and fill the secondary drip chamber", modal:chamberModal},
+    {id:"prime", act:"secClamp", label:"Prime the secondary line", done:"Clamp opened, fluid ran to the end with no air, clamp closed again.", apply:()=>st.primed=true},
+    {id:"scrub", act:"yport", label:"Scrub the upper Y-port", crit:true, modal:scrubModal},
+    {id:"connect", act:"yport", label:"Connect the secondary line to the upper Y-port", done:"Connected to the upper Y-port.", apply:()=>st.connected=true},
+    {id:"lower", act:"exthook", label:"Lower the primary bag with the extension hook", done:"Primary bag lowered. The minibag is higher now, so it runs first.", apply:()=>st.lowered=true},
+    {id:"program", act:"pump", label:"Program the pump as a SECONDARY infusion", crit:true, modal:pumpModal, mode:"pump"},
+    {id:"open", act:"secClamp", label:"Open the secondary clamp", done:"Secondary clamp open.", apply:()=>st.clamp="open", mode:"pump"},
+    {id:"start", act:"pump", label:"Start the pump and watch the drip chamber", done:"Pump running. Secondary chamber is dripping. ✓", apply:()=>st.running=true, mode:"pump"},
+    {id:"drip", act:"secClamp", label:"Open the roller clamp and set the drip rate (count drops)", crit:true, modal:dripModal, mode:"gravity"},
+    {id:"reassess", act:"patient", label:"Check on the patient and the IV site", done:"Site looks good. Patient is comfortable."},
+    {id:"doc", act:"computer", label:"Document in the eHR", modal:docModal}
+  ];
+  return all.filter(s=>!s.mode || s.mode===S.mode);
+}
+
+/* =========================================================
+   SCENE (SVG)
+========================================================= */
+function hs(act, inner, hit){
+  const glow = settings.learn && steps[cur] && steps[cur].act===act ? " glow" : "";
+  return `<g class="hs${glow}" data-act="${act}">${hit}${inner}</g>`;
+}
+function scene(){
+  const pY = st.lowered ? 125 : 58;
+  const clampColor = st.clamp==="open" ? "#3ecf8e" : st.clamp==="closed" ? "#ff6b6b" : "#9aa5b5";
+  const T = (x,y,t,a="middle") => `<text x="${x}" y="${y}" fill="#9aa5b5" font-size="12" text-anchor="${a}">${t}</text>`;
+  let g = "";
+  // pole
+  g += `<line x1="230" y1="30" x2="230" y2="535" stroke="#6b7685" stroke-width="6"/>
+        <line x1="150" y1="36" x2="310" y2="36" stroke="#6b7685" stroke-width="5"/>
+        <path d="M200 535 h60 M230 535 l-40 15 M230 535 l40 15" stroke="#6b7685" stroke-width="5"/>`;
+  // primary bag (+ extension hook if lowered)
+  if(st.lowered) g += `<line x1="188" y1="36" x2="188" y2="${pY}" stroke="#c9a227" stroke-width="3"/>`;
+  else g += `<line x1="188" y1="36" x2="188" y2="${pY}" stroke="#6b7685" stroke-width="3"/>`;
+  g += hs("primBag", `<rect x="160" y="${pY}" width="56" height="84" rx="10" fill="#cfe3ff" fill-opacity=".85" stroke="#8fb4e8"/>
+        <text x="188" y="${pY+38}" font-size="11" text-anchor="middle" fill="#123">1000 mL</text>
+        <text x="188" y="${pY+52}" font-size="11" text-anchor="middle" fill="#123">Primary</text>`,
+        `<rect class="hit" x="150" y="${pY-6}" width="76" height="96" rx="12" fill="transparent"/>`);
+  // primary chamber + line
+  g += `<rect x="181" y="${pY+90}" width="14" height="28" rx="4" fill="#dfe9f7" fill-opacity=".5" stroke="#8fb4e8"/>
+        <line x1="188" y1="${pY+118}" x2="188" y2="300" stroke="#cfd8e3" stroke-width="3"/>`;
+  g += hs("primClamp", `<rect x="178" y="215" width="20" height="14" rx="3" fill="#9aa5b5"/>`,
+        `<rect class="hit" x="164" y="205" width="48" height="34" rx="8" fill="transparent"/>`) + T(158,226,"primary clamp","end");
+  // upper Y port
+  g += hs("yport", `<circle cx="188" cy="270" r="9" fill="${st.scrubbed?"#3ecf8e":"#ffc04d"}" stroke="#111"/>`,
+        `<circle class="hit" cx="188" cy="270" r="24" fill="transparent"/>`) + T(158,274,"upper Y-port","end");
+  // pump or plain line
+  if(S.mode==="pump"){
+    g += hs("pump", `<rect x="138" y="300" width="100" height="110" rx="10" fill="#2b3442" stroke="#59677a"/>
+          <rect x="148" y="312" width="80" height="40" rx="4" fill="#0b1a12" stroke="#3ecf8e"/>
+          <text x="188" y="330" font-size="10" text-anchor="middle" fill="#3ecf8e">${st.pumpL1}</text>
+          <text x="188" y="345" font-size="10" text-anchor="middle" fill="#3ecf8e">${st.pumpL2}</text>
+          <circle cx="165" cy="380" r="9" fill="#3ecf8e"/><circle cx="211" cy="380" r="9" fill="#ff6b6b"/>`,
+          `<rect class="hit" x="128" y="292" width="120" height="126" rx="12" fill="transparent"/>`) + T(188,428,"IV pump");
+    g += `<line x1="188" y1="410" x2="188" y2="470" stroke="#cfd8e3" stroke-width="3"/>`;
+  } else {
+    g += `<line x1="188" y1="300" x2="188" y2="470" stroke="#cfd8e3" stroke-width="3"/>` + T(160,380,"(no pump)","end");
+  }
+  g += `<path d="M188 470 Q188 485 205 485 L560 485 Q590 485 600 462" fill="none" stroke="#cfd8e3" stroke-width="3"/>`;
+  g += hs("lowport", `<circle cx="380" cy="485" r="8" fill="#ffc04d" stroke="#111"/>`,
+        `<circle class="hit" cx="380" cy="485" r="22" fill="transparent"/>`) + T(380,512,"lower port");
+  // table
+  g += `<rect x="420" y="330" width="230" height="10" rx="3" fill="#59677a"/><line x1="440" y1="340" x2="440" y2="420" stroke="#59677a" stroke-width="5"/><line x1="630" y1="340" x2="630" y2="420" stroke="#59677a" stroke-width="5"/>` + T(535,355,"bedside table");
+  // minibag + secondary tubing
+  if(!st.hung){
+    g += hs("hook", `<path d="M282 36 v12 q0 10 -8 10" fill="none" stroke="#9aa5b5" stroke-width="3"/>`,
+          `<rect class="hit" x="256" y="26" width="52" height="44" rx="10" fill="transparent"/>`) + T(300,80,"empty hook","start");
+    g += hs("minibag", `<rect x="440" y="282" width="80" height="44" rx="10" fill="#fff3c4" fill-opacity=".9" stroke="#c9a227"/>
+          <text x="480" y="302" font-size="11" text-anchor="middle" fill="#3a2e00">${S.o.drug}</text>
+          <text x="480" y="316" font-size="11" text-anchor="middle" fill="#3a2e00">${S.o.vol} mL</text>`,
+          `<rect class="hit" x="432" y="272" width="96" height="62" rx="12" fill="transparent"/>`);
+    if(st.spiked){
+      g += `<path d="M520 304 C560 300 560 320 590 318" fill="none" stroke="#cfd8e3" stroke-width="3"/>`;
+    }
+    g += `<circle cx="595" cy="306" r="18" fill="none" stroke="#cfd8e3" stroke-width="3"/><circle cx="595" cy="306" r="11" fill="none" stroke="#cfd8e3" stroke-width="3"/>`;
+    g += hs("secClamp", `<rect x="574" y="282" width="20" height="14" rx="3" fill="${clampColor}"/>`,
+          `<rect class="hit" x="560" y="270" width="48" height="36" rx="8" fill="transparent"/>`) + T(620,280,"secondary tubing","start");
+  } else {
+    g += `<line x1="282" y1="36" x2="282" y2="50" stroke="#6b7685" stroke-width="3"/>
+          <rect x="258" y="50" width="48" height="64" rx="10" fill="#fff3c4" fill-opacity=".9" stroke="#c9a227"/>
+          <text x="282" y="80" font-size="10" text-anchor="middle" fill="#3a2e00">${S.o.drug.slice(0,7)}</text>
+          <text x="282" y="94" font-size="10" text-anchor="middle" fill="#3a2e00">${S.o.vol} mL</text>`;
+    const lvl = st.chamberFull ? 12 : 0;
+    g += hs("secChamber", `<rect x="275" y="120" width="14" height="30" rx="4" fill="#dfe9f7" fill-opacity=".35" stroke="#8fb4e8"/>
+          <rect x="276" y="${149-lvl}" width="12" height="${lvl}" fill="#5aa9ff" fill-opacity=".7"/>
+          ${st.running?`<circle class="drop" cx="282" cy="124" r="2.5" fill="#5aa9ff"><animate attributeName="cy" from="124" to="${147-lvl}" dur="0.6s" repeatCount="indefinite"/></circle>`:""}`,
+          `<rect class="hit" x="262" y="114" width="40" height="42" rx="8" fill="transparent"/>`) + T(306,140,"drip chamber","start");
+    if(st.connected){
+      g += `<path d="M282 150 L282 200 Q282 240 196 266" fill="none" stroke="#cfd8e3" stroke-width="3"/>`;
+    } else {
+      g += `<path d="M282 150 L282 230 Q282 250 300 250" fill="none" stroke="#cfd8e3" stroke-width="3"/><circle cx="302" cy="250" r="4" fill="#cfd8e3"/>`;
+    }
+    g += hs("secClamp", `<rect x="272" y="182" width="20" height="14" rx="3" fill="${clampColor}"/>`,
+          `<rect class="hit" x="258" y="170" width="48" height="38" rx="8" fill="transparent"/>`) + T(306,194,"secondary clamp","start");
+  }
+  // patient
+  g += hs("patient", `<rect x="480" y="440" width="320" height="34" rx="10" fill="#3a4556"/>
+        <rect x="560" y="418" width="190" height="28" rx="12" fill="#7fa7c9"/>
+        <circle cx="772" cy="420" r="22" fill="#d9b38c"/>
+        <path d="M600 448 L640 432" stroke="#d9b38c" stroke-width="12" stroke-linecap="round"/>
+        <rect x="612" y="433" width="14" height="10" rx="2" fill="#f4f7ff" stroke="#9bb4e6" transform="rotate(-20 619 438)"/>`,
+        `<rect class="hit" x="560" y="390" width="250" height="90" rx="14" fill="transparent"/>`) + T(690,500,"patient (tap to talk / check)");
+  return `<svg viewBox="0 0 820 540" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;
+}
+
+/* =========================================================
+   RENDER
+========================================================= */
+function seg(name, opts){
+  return `<div class="seg">${opts.map(([v,l])=>`<button class="${String(settings[name])===String(v)?"on":""}" onclick="setOpt('${name}','${v}')">${l}</button>`).join("")}</div>`;
+}
+function setOpt(n,v){ settings[n] = n==="drop" ? +v : n==="learn" ? v==="true" : v; renderStart(); }
+
+function renderStart(){
+  stopTimer();
+  $("#app").innerHTML = `
+    <div class="topbar"><h1>IV Piggyback: Bedside Simulator</h1><a href="./" class="small">← Back to mock exam</a></div>
+    <p class="muted">Tap things in the right order: the patient, the clamps, the bag, the port, the pump. Like doing it with real hands, but on screen.</p>
+    <div class="card">
+      <h3>Mode</h3>${seg("learn",[["true","Learn (shows the next step)"],["false","Test (no hints, timed)"]])}
+      <h3>Drug</h3>${seg("drug",[["random","Random"],["labetalol","Labetalol"],["ceftazidime","Ceftazidime"],["moxifloxacin","Moxifloxacin"]])}
+      <h3>How it runs</h3>${seg("mode",[["pump","Pump"],["gravity","Gravity (count drops)"]])}
+      <h3>Secondary tubing</h3>${seg("drop",[[10,"10 gtt/mL"],[20,"20 gtt/mL"]])}
+      <div class="row" style="margin-top:16px"><button class="btn" onclick="startSim()">Start →</button></div>
+    </div>
+    <div class="card small">
+      <b>Tips</b>
+      <ul>
+        <li>Start in <b>Learn</b> mode. The next thing to tap glows yellow.</li>
+        <li>Then switch to <b>Test</b>. No glow. Wrong taps are counted. Missing a safety step = fail.</li>
+        <li>Works best on a laptop or tablet. On a phone, turn it sideways.</li>
+      </ul>
+    </div>
+    <footer>Practice only. Steps follow common nursing school practice. If her lab teaches a step differently (for example back-priming), go with her lab.</footer>`;
+}
+
+function startSim(){
+  buildScenario();
+  st = {clamp:"unset", spiked:false, hung:false, chamberFull:false, primed:false, scrubbed:false, connected:false, lowered:false, running:false,
+        pumpL1:`PRI ${pick([75,80,100,125])} mL/hr`, pumpL2:"RUNNING"};
+  steps = buildSteps(); cur = 0; errors = []; wrongClicks = 0; t0 = Date.now();
+  stopTimer(); timerId = setInterval(()=>{ const el=$("#timer"); if(el) el.textContent = fmtTime(Date.now()-t0); }, 1000);
+  render();
+  if(S.note) toast(S.note, "bad", 4500);
+}
+function stopTimer(){ if(timerId) clearInterval(timerId); timerId=null; }
+function fmtTime(ms){ const s=Math.floor(ms/1000); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
+
+function render(){
+  const step = steps[cur];
+  $("#app").innerHTML = `
+    <div class="topbar">
+      <div class="row"><b>${S.name}</b><span class="pill">UI# ${S.ui}</span><span class="pill">DOB ${S.dob}</span></div>
+      <div class="row"><span class="pill">Step ${cur+1} / ${steps.length}</span><span class="pill">⏱ <span id="timer">${fmtTime(Date.now()-t0)}</span></span><span class="pill">Wrong taps: ${wrongClicks}</span></div>
+    </div>
+    <div class="card" style="padding:12px 14px">
+      <div><b>Order:</b> ${orderText()} &nbsp;·&nbsp; <b>Tubing:</b> ${S.C} gtt/mL &nbsp;·&nbsp; <b>Run by:</b> ${S.mode==="pump"?"pump":"gravity"}</div>
+      ${settings.learn ? `<div class="next"><b>Next:</b> ${step.label}</div>` : `<div class="small muted" style="margin-top:6px">Test mode: no hints. What's next?</div>`}
+    </div>
+    <div class="scene">
+      ${scene()}
+      <div class="toast" id="toast"></div>
+      <div class="tools">
+        ${tool("sanitizer","🧴","Hand sanitizer")}${tool("scanner","📟","Barcode scanner")}${tool("exthook","🪝","Extension hook")}${tool("computer","💻","eHR computer")}
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn ghost" onclick="if(confirm('Restart with a new patient?'))startSim()">New patient</button>
+      <button class="btn ghost" onclick="renderStart()">Settings</button>
+    </div>`;
+}
+function tool(act, icon, name){
+  const glow = settings.learn && steps[cur] && steps[cur].act===act ? " glow" : "";
+  return `<button class="tool${glow}" data-act="${act}"><span>${icon}</span>${name}</button>`;
+}
+
+function toast(msg, kind, ms=2600){
+  const el = $("#toast"); if(!el) return;
+  el.className = `toast ${kind} show`; el.innerHTML = msg;
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>{ el.classList.remove("show"); }, ms);
+}
+
+/* =========================================================
+   ACTION ENGINE
+========================================================= */
+document.addEventListener("click", e => {
+  if(modalOpen) return;
+  const el = e.target.closest("[data-act]");
+  if(!el || !steps || cur>=steps.length) return;
+  doAct(el.dataset.act);
+});
+
+function logErr(msg, crit){ errors.push({step:steps[cur].label, msg, crit:!!crit}); }
+
+function doAct(a){
+  const step = steps[cur];
+  if(a===step.act){
+    if(step.modal) step.modal(step); else complete(step);
+    return;
+  }
+  wrongClicks++;
+  let msg;
+  if(a==="lowport" && (step.id==="scrub"||step.id==="connect")) msg = "Wrong port. The piggyback goes into the <b>upper Y-port</b> (above the pump), not the lower port.";
+  else msg = settings.learn ? `Not yet. Next: <b>${step.label}</b>` : "Not the right next step.";
+  logErr(`Tapped the ${ACT_NAMES[a]||a} when the next step was: "${step.label}"`, false);
+  render(); toast(msg, "bad");
+}
+
+function complete(step, msg){
+  if(step.apply) step.apply();
+  cur++;
+  if(cur>=steps.length){ finish(); return; }
+  render(); toast(msg || step.done || "Done ✓", "good");
+}
+
+/* =========================================================
+   MODALS
+========================================================= */
+function openModal(html){ modalOpen=true; $("#modal").innerHTML = html; $("#ov").classList.add("show"); }
+function closeModal(){ modalOpen=false; $("#ov").classList.remove("show"); if(dripTimer){clearInterval(dripTimer); dripTimer=null;} }
+
+function idModal(step){
+  const band = S.bandErr ? S.badUI : S.ui;
+  openModal(`<h3>Identify the patient</h3>
+    <p>You ask: "Can you tell me your full name and date of birth?"</p>
+    <div class="say">"${S.name}. Born ${S.dob}."</div>
+    <p class="small muted">Armband:</p><div class="band">${S.name} · UI# ${band} · DOB ${S.dob}</div>
+    <p class="small muted">Your minibag label:</p><div class="label">${S.name} · UI# ${S.ui} · DOB ${S.dob}<br>${S.o.drug} ${S.o.dose}</div>
+    <p><b>Compare them. What do you do?</b></p>
+    <button class="choice" onclick="idAns(false)">✅ Everything matches. Continue.</button>
+    <button class="choice" onclick="idAns(true)">🛑 Something doesn't match. Stop.</button>`);
+}
+function idAns(saidMismatch){
+  closeModal(); const step = steps[cur];
+  if(saidMismatch === S.bandErr){
+    complete(step, S.bandErr ? "Good catch! The armband UI# didn't match. Pharmacy fixes the label. Continue." : "Patient identified. 2 identifiers match. ✓");
+  } else {
+    if(S.bandErr) logErr(`Missed it: armband UI# was ${S.badUI}, label said ${S.ui}.`, true);
+    else logErr("Said there was a mismatch, but everything matched. Look closely at all 3: name, UI#, DOB.", false);
+    complete(step, S.bandErr ? "❌ The armband UI# did NOT match the label. That's a critical miss. (Continuing for practice.)" : "Actually everything matched. Look at name, UI#, DOB one by one.");
+  }
+}
+
+function allergyModal(step){
+  openModal(`<h3>Allergy check</h3>
+    <p>You ask: "Do you have any allergies to medications?"</p>
+    <div class="say">"${S.allergy.say}"</div>
+    <p>You're about to give <b>${S.o.drug}</b>. What do you do?</p>
+    <button class="choice" onclick="allergyAns(false)">▶️ Safe to continue.</button>
+    <button class="choice" onclick="allergyAns(true)">🛑 Hold and call the prescriber.</button>`);
+}
+function allergyAns(held){
+  closeModal(); const step = steps[cur], a = S.allergy;
+  if(held === a.hold){
+    complete(step, a.hold ? `Correct. ${a.why} (For practice, pretend it's sorted out. Keep going.)` : (a.why ? `Correct. ${a.why}` : "Allergies checked. ✓"));
+  } else {
+    if(!held) logErr(`Gave ${S.o.drug} when the patient said: "${a.say}". ${a.why}`, true);
+    else logErr(`Held when it was safe. ${a.why||"No allergies."}`, false);
+    complete(step, !held ? `❌ ${a.why} (Critical. Continuing for practice.)` : `Not needed. ${a.why||"No allergies."}`);
+  }
+}
+
+function spikeModal(step){
+  openModal(`<h3>Spike the minibag</h3>
+    <p>The secondary tubing spike is sterile. How do you put it into the bag?</p>
+    <button class="choice" onclick="spikeAns(0)">Take the cap off and push the spike straight into the bag port. Touch nothing.</button>
+    <button class="choice" onclick="spikeAns(1)">Wipe the spike with an alcohol swab first, then push it in.</button>
+    <button class="choice" onclick="spikeAns(2)">Hold the spike with your fingers to guide it into the port.</button>`);
+}
+function spikeAns(i){
+  closeModal(); const step = steps[cur];
+  st.spiked = true;
+  if(i===0) complete(step, "Spiked with sterile technique. ✓");
+  else {
+    const why = i===1 ? "The spike is already sterile. Don't wipe or touch it." : "Fingers on the spike = contaminated. You'd need new tubing.";
+    logErr(`Spike: ${why}`, true);
+    complete(step, `❌ ${why} (Critical. Continuing for practice.)`);
+  }
+}
+
+function chamberModal(step){
+  openModal(`<h3>Fill the drip chamber</h3>
+    <p>You squeeze the drip chamber. How full should it be?</p>
+    <button class="choice" onclick="chamberAns(1)">Completely full</button>
+    <button class="choice" onclick="chamberAns(0)">About 1/3 to 1/2 full</button>
+    <button class="choice" onclick="chamberAns(2)">Leave it empty</button>`);
+}
+function chamberAns(i){
+  closeModal(); const step = steps[cur];
+  st.chamberFull = true;
+  if(i===0) complete(step, "Chamber 1/3 to 1/2 full. You can see and count the drops. ✓");
+  else {
+    const why = i===1 ? "Too full: you can't see or count the drops." : "Empty: air can get into the line.";
+    logErr(`Drip chamber: ${why} Aim for 1/3 to 1/2.`, false);
+    complete(step, `Not quite. ${why} Aim for 1/3 to 1/2.`);
+  }
+}
+
+let holdStart=0, holdRaf=null, holdTries=0;
+function scrubModal(step){
+  holdTries=0;
+  openModal(`<h3>Scrub the upper Y-port</h3>
+    <p>Alcohol swab. Scrub the hub with a twisting motion for <b>15 seconds</b>.</p>
+    <p class="small muted">Press and HOLD the button for the full time. Let go too early and you start over.</p>
+    <button class="holdbtn" id="hold">Hold to scrub</button>
+    <div class="bar"><div id="holdBar"></div></div>
+    <p id="holdMsg" class="small"></p>`);
+  const b = $("#hold");
+  const startH = e => { e.preventDefault(); holdStart = performance.now(); b.classList.add("active"); tick(); };
+  const endH = e => {
+    if(!holdStart) return;
+    const secs = (performance.now()-holdStart)/1000; holdStart=0; cancelAnimationFrame(holdRaf); b.classList.remove("active");
+    if(secs < 15){
+      holdTries++; $("#holdBar").style.width="0%";
+      $("#holdMsg").innerHTML = `<span class="err">Only ${secs.toFixed(1)} sec. Too short. Scrub the full 15 seconds.</span>`;
+      if(holdTries===1) logErr(`Scrubbed the port for only ${secs.toFixed(1)} sec (needs 15).`, false);
+    }
+  };
+  function tick(){
+    if(!holdStart) return;
+    const secs = (performance.now()-holdStart)/1000;
+    $("#holdBar").style.width = Math.min(100, secs/15*100) + "%";
+    b.textContent = secs < 15 ? `Scrubbing... ${secs.toFixed(1)} s` : "Done!";
+    if(secs >= 15){ holdStart=0; b.classList.remove("active"); st.scrubbed=true; setTimeout(()=>{ closeModal(); complete(steps[cur], "Scrubbed 15 sec. Let it dry, then connect. ✓"); }, 400); return; }
+    holdRaf = requestAnimationFrame(tick);
+  }
+  b.addEventListener("pointerdown", startH);
+  ["pointerup","pointerleave","pointercancel"].forEach(ev=>b.addEventListener(ev, endH));
+  b.addEventListener("contextmenu", e=>e.preventDefault());
+}
+
+let pumpTries=0;
+function pumpModal(step){
+  pumpTries=0;
+  openModal(`<h3>Program the pump</h3>
+    <p class="small muted">Order: ${orderText()}</p>
+    <p><b>1. Which infusion?</b></p>
+    <div class="seg" id="pmode"><button onclick="pm('pri')" id="pm_pri">Primary</button><button onclick="pm('sec')" id="pm_sec">Secondary</button></div>
+    <p style="margin-top:12px"><b>2. Rate and volume</b></p>
+    <div class="row">
+      <label>Rate <input type="number" step="any" id="pRate" placeholder="mL/hr"></label>
+      <label>VTBI <input type="number" step="any" id="pVtbi" placeholder="mL"></label>
+    </div>
+    <p class="small muted">VTBI = volume to be infused (how much is in the bag).</p>
+    <div class="row"><button class="btn" onclick="pumpCheck()">Confirm</button><button class="btn ghost" onclick="closeModal()">Cancel</button></div>
+    <p id="pMsg"></p>`);
+  window._pm = null;
+}
+function pm(v){ window._pm=v; $("#pm_pri").classList.toggle("on",v==="pri"); $("#pm_sec").classList.toggle("on",v==="sec"); }
+function pumpCheck(){
+  const rate = parseFloat($("#pRate").value), vtbi = parseFloat($("#pVtbi").value);
+  const probs = [];
+  if(window._pm!=="sec") probs.push("Pick <b>Secondary</b>. The minibag is a secondary (piggyback) infusion.");
+  if(isNaN(rate) || Math.abs(rate - S.pump) > 1) probs.push("Rate isn't right. Redo the math.");
+  if(isNaN(vtbi) || Math.abs(vtbi - S.o.vol) > 0.5) probs.push("VTBI isn't right. It's the volume in the minibag.");
+  if(probs.length){
+    pumpTries++;
+    if(pumpTries===1) logErr(`Pump programming wrong on first try: ${probs.map(p=>p.replace(/<[^>]+>/g,"")).join(" ")} (Correct: secondary, ${S.pump} mL/hr, VTBI ${S.o.vol} mL)`, true);
+    $("#pMsg").innerHTML = `<span class="err">${probs.join("<br>")}</span>` + (settings.learn && pumpTries>=2 ? `<br><span class="muted small">Hint: ${S.o.mgPerMin ? `${S.o.mgPerMin} mg/min × 60 ÷ ${S.o.conc} mg/mL` : `${S.o.vol} mL ÷ ${r2(S.o.min/60)} hr`} = ${S.pump} mL/hr</span>` : "");
+    return;
+  }
+  closeModal();
+  st.pumpL1 = `SEC ${S.pump} mL/hr`; st.pumpL2 = `VTBI ${S.o.vol} mL`;
+  complete(steps[cur], `Pump set: secondary, ${S.pump} mL/hr, VTBI ${S.o.vol} mL. ✓`);
+}
+
+let dripRate=0, countTimer=null;
+function dripModal(step){
+  dripRate = 0; let start;
+  do { start = 10 + Math.floor(Math.random()*140); } while(Math.abs(start - S.grav) < 15);
+  dripRate = start;
+  openModal(`<h3>Set the gravity drip rate</h3>
+    <p class="small muted">Order: ${orderText()} · Tubing ${S.C} gtt/mL</p>
+    ${settings.learn ? `<p>Target: <b>${S.grav} gtt/min</b> <span class="muted small">(V ÷ T × C = ${S.o.vol} ÷ ${S.o.min} × ${S.C})</span></p>` : `<p>Work out your target gtt/min, then set it.</p>`}
+    <div class="row" style="align-items:flex-start;gap:20px">
+      <svg viewBox="0 0 80 130" style="width:80px;height:130px;flex:none">
+        <rect x="25" y="5" width="30" height="110" rx="8" fill="#dfe9f7" fill-opacity=".25" stroke="#8fb4e8" stroke-width="2"/>
+        <rect x="35" y="5" width="10" height="12" fill="#8fb4e8"/>
+        <rect x="27" y="80" width="26" height="33" rx="4" fill="#5aa9ff" fill-opacity=".6"/>
+        <g id="drops"></g>
+      </svg>
+      <div style="flex:1;min-width:200px">
+        <p class="small"><b>Roller clamp</b> (slide to loosen or tighten)</p>
+        <div class="row small muted" style="justify-content:space-between"><span>tighter</span><span>looser</span></div>
+        <input type="range" min="0" max="160" value="${start}" id="roller" oninput="setDrip(+this.value)">
+        <p class="small" style="margin-top:10px">Count the drops for 15 seconds, then × 4.</p>
+        <div class="row"><button class="btn ghost" id="cbtn" onclick="count15()">Start 15-sec count</button><span id="cdown" class="pill">--</span></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="btn" onclick="dripDone()">Rate is set ✓</button></div>
+    <p id="dMsg"></p>`);
+  setDrip(start);
+}
+function setDrip(v){
+  dripRate = v;
+  if(dripTimer){ clearInterval(dripTimer); dripTimer=null; }
+  if(v<=0) return;
+  dripTimer = setInterval(()=>{
+    const g = document.getElementById("drops"); if(!g) return;
+    const c = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    c.setAttribute("cx","40"); c.setAttribute("cy","22"); c.setAttribute("r","3.5"); c.setAttribute("fill","#5aa9ff"); c.setAttribute("class","drop");
+    g.appendChild(c); setTimeout(()=>c.remove(), 600);
+  }, 60000/v);
+}
+function count15(){
+  if(countTimer) return;
+  let left = 15; $("#cdown").textContent = left+" s"; $("#cbtn").disabled = true;
+  countTimer = setInterval(()=>{
+    left--; const el=$("#cdown"); if(!el){ clearInterval(countTimer); countTimer=null; return; }
+    el.textContent = left>0 ? left+" s" : "Stop! × 4";
+    if(left<=0){ clearInterval(countTimer); countTimer=null; $("#cbtn").disabled=false; }
+  }, 1000);
+}
+let dripTries=0;
+function dripDone(){
+  const off = Math.abs(dripRate - S.grav);
+  if(off <= 3){
+    closeModal(); st.clamp="open"; st.running=true;
+    complete(steps[cur], `Drip set to about ${dripRate} gtt/min (target ${S.grav}). ✓`);
+  } else {
+    dripTries++;
+    if(dripTries===1) logErr(`Gravity rate was ${dripRate} gtt/min. Target was ${S.grav} gtt/min.`, true);
+    $("#dMsg").innerHTML = `<span class="err">Not quite. It's dripping about ${dripRate} gtt/min. ${dripRate > S.grav ? "Too fast: tighten the clamp." : "Too slow: loosen the clamp."} Count again.</span>`;
+  }
+}
+
+function docModal(step){
+  const items = [["Date and time given",1],["Drug and dose",1],["Volume and rate",1],["IV site and how it looks",1],["How the patient is doing",1],["The next patient's room number",0],["Your lunch break time",0]].sort(()=>Math.random()-.5);
+  window._doc = items;
+  openModal(`<h3>Document in the eHR</h3><p>Pick everything you document:</p>
+    ${items.map((it,i)=>`<label class="ck"><input type="checkbox" id="dk${i}"> ${it[0]}</label>`).join("")}
+    <div class="row" style="margin-top:10px"><button class="btn" onclick="docCheck()">Save</button></div><p id="docMsg"></p>`);
+}
+function docCheck(){
+  const items = window._doc; let miss=[], extra=[];
+  items.forEach((it,i)=>{ const c=$("#dk"+i).checked; if(it[1]&&!c) miss.push(it[0]); if(!it[1]&&c) extra.push(it[0]); });
+  closeModal();
+  if(!miss.length && !extra.length) complete(steps[cur], "Documented. ✓");
+  else { logErr(`Documentation: ${miss.length?`missed ${miss.join(", ")}. `:""}${extra.length?`Didn't need: ${extra.join(", ")}.`:""}`, false); complete(steps[cur], "Saved, but not quite complete. See the summary."); }
+}
+
+/* =========================================================
+   FINISH
+========================================================= */
+function finish(){
+  stopTimer();
+  const time = fmtTime(Date.now()-t0);
+  const crit = errors.filter(e=>e.crit), minor = errors.filter(e=>!e.crit && !e.msg.startsWith("Tapped"));
+  const taps = errors.filter(e=>e.msg.startsWith("Tapped"));
+  const pass = crit.length===0;
+  $("#app").innerHTML = `
+    <div class="topbar"><h1>${pass ? "✅ PASS" : "❌ FAIL"}</h1><a href="./" class="small">← Back to mock exam</a></div>
+    <p class="muted">${S.name} · ${orderText()} · ${settings.learn?"Learn":"Test"} mode</p>
+    <div class="card">
+      <div class="sumrow"><span>Time</span><b>${time}</b></div>
+      <div class="sumrow"><span>Critical errors (= fail)</span><b class="${crit.length?"err":"ok"}">${crit.length}</b></div>
+      <div class="sumrow"><span>Other mistakes</span><b>${minor.length}</b></div>
+      <div class="sumrow"><span>Wrong taps (out of order)</span><b>${wrongClicks}</b></div>
+    </div>
+    ${crit.length ? `<div class="card"><h3 class="err">Critical errors</h3><ul>${crit.map(e=>`<li>${e.msg}</li>`).join("")}</ul></div>` : ""}
+    ${minor.length ? `<div class="card"><h3>Other mistakes</h3><ul>${minor.map(e=>`<li>${e.msg}</li>`).join("")}</ul></div>` : ""}
+    ${taps.length ? `<div class="card"><h3>Out-of-order taps</h3><ul class="small">${taps.map(e=>`<li>${e.msg}</li>`).join("")}</ul></div>` : ""}
+    <div class="card"><h3>The correct order</h3><ol class="small">${steps.map(s=>`<li>${s.label}${s.crit?' <span class="err">(critical)</span>':""}</li>`).join("")}</ol></div>
+    <div class="row"><button class="btn" onclick="startSim()">Next patient →</button><button class="btn ghost" onclick="renderStart()">Settings</button></div>`;
+  window.scrollTo(0,0);
+}
+
+renderStart();
+</script>
+</body>
+</html>
